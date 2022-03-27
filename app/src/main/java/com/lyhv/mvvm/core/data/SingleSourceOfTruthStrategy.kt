@@ -1,6 +1,7 @@
 package com.lyhv.mvvm.core.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -71,4 +72,32 @@ fun <T> getFirstResultFailure(vararg results: Result<*>): Result.Failure<T> {
         status = firstResultFailure.status,
         errors = firstResultFailure.errors
     )
+}
+
+suspend fun <T> retry(
+    times: Int = 3,
+    initialDelayMSec: Long = 100,
+    maxDelayMSec: Long = 1000,
+    factor: Double = 2.0,
+    isSuccessBlock: (T) -> Boolean,
+    block: suspend () -> T
+): T {
+    if (times < 1) {
+        throw RuntimeException("The times is must be a positive integer greater than 0")
+    }
+    var currentDelay = initialDelayMSec
+    val repeatTime = times - 1
+    repeat(repeatTime) {
+        try {
+            val result = block()
+            if (isSuccessBlock(result)) {
+                return result
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        delay(currentDelay)
+        currentDelay = (currentDelay * factor).toLong().coerceAtMost(maxDelayMSec)
+    }
+    return block()
 }
